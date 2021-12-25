@@ -1,5 +1,8 @@
-FROM staticfloat/nginx-certbot
+FROM nginx:alpine
 
-COPY ./user.conf.d /etc/nginx/user.conf.d
+COPY ./config /etc/nginx/config
 COPY ./nginx.conf /etc/nginx/nginx.conf
-COPY ./certbot/extra_domains /etc/nginx/certbot/extra_domains
+COPY ./default.conf /etc/nginx/conf.d/default.conf
+COPY ./config/html/error.html /var/www/default/error.html
+
+EXPOSE 80

@@ -1,37 +1,38 @@
-version: "3.8"
+version: "3.7"
 
 services:
-  proxy:
-    image: "proxy"
-    build:
-      dockerfile: Dockerfile
-      context: ./nginx
-      cache_from:
-      - "proxy"
-    restart: always
-    environment:
-      CERTBOT_EMAIL: "mvbureev@gmail.com"
-    ports:
-      - "80:80"
-      - "443:443"
+  test-nextjs:
+    image: test-nextjs
+    container_name: test-nextjs
     networks:
-      - mvbureev-landing
-
-  nextjs:
-    image: "nextjs"
+      - proxy
     build:
       dockerfile: Dockerfile
       context: ./
       cache_from:
-      - "nextjs"
+      - test-nextjs
     restart: unless-stopped
-    depends_on:
-      - proxy
-    ports:
-      - "3001:3001"
+
+  test-proxy:
+    image: test-proxy
+    container_name: test-proxy
     networks:
-      - mvbureev-landing
+      - proxy
+    depends_on:
+      - test-nextjs
+    build:
+      dockerfile: Dockerfile
+      context: ./nginx
+      cache_from:
+      - test-proxy
+    restart: always
+    labels:
+      - traefik.http.routers.test.rule=Host("test.${DOMAIN}")
+      - traefik.http.routers.test.entrypoints=https
+      - traefik.http.routers.test.tls=true
+      - traefik.http.routers.test.tls.certresolver=${CERT_RESOLVER}
+      - traefik.docker.network=proxy
 
 networks:
-  mvbureev-landing:
-    driver: bridge
+  proxy:
+    external: true

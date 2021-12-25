@@ -1,8 +1,16 @@
-docker-build:
+image: docker/compose
+
+cache:
+  key: cache-${CI_PROJECT_TITLE}-${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules
+
+stages:
+  - build
+  - deploy
+
+build:
   stage: build
-  # variables:
-  #   DOCKER_HOST: tcp://docker:2376
-  image: docker/compose
   tags:
     - mvbureev
   before_script:
@@ -10,8 +18,19 @@ docker-build:
     - docker info
     - docker-compose version
     - docker-compose config
-    - docker-compose ps
   script:
     - docker-compose pull
     - docker-compose build
+  only:
+  - main
+
+deploy:
+  stage: deploy
+  tags:
+    - mvbureev
+  before_script:
+    - docker-compose ps
+  script:
     - docker-compose up -d
+  only:
+  - main

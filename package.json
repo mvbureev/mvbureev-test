@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prod": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint"
   },
