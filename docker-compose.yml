@@ -15,7 +15,7 @@ services:
       - "80:80"
       - "443:443"
     networks:
-      - mvbureev-test
+      - mvbureev-landing
 
   nextjs:
     image: "nextjs"
@@ -30,8 +30,8 @@ services:
     ports:
       - "3001:3001"
     networks:
-      - mvbureev-test
+      - mvbureev-landing
 
 networks:
-  mvbureev-test:
+  mvbureev-landing:
     driver: bridge
