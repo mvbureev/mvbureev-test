@@ -1,6 +1,18 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import Head from 'next/head';
+import Image from 'next/image';
+import Link from 'next/link';
+import styles from '../styles/Home.module.css';
+
+const testLintArray = [
+  {
+    id: 1,
+    text: '1',
+  },
+  {
+    id: 2,
+    text: '2',
+  },
+];
 
 export default function Home() {
   return (
@@ -12,12 +24,28 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
+        <nav>
+          <Link href="/about">
+            About
+          </Link>
+        </nav>
+
+        <br />
+
         <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
+          Welcome to
+          {' '}
+          <a href="https://nextjs.org">
+            Next.js!
+          </a>
+          <br />
+          {process?.env?.SUBDOMAIN}
+          {process?.env?.DOMAIN}
         </h1>
 
         <p className={styles.description}>
-          Get started by editing{' '}
+          Get started by editing
+          {' '}
           <code className={styles.code}>pages/index.js</code>
         </p>
 
@@ -41,7 +69,7 @@ export default function Home() {
           </a>
 
           <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+            href="https://vercel.com/new"
             className={styles.card}
           >
             <h2>Deploy &rarr;</h2>
@@ -50,20 +78,36 @@ export default function Home() {
             </p>
           </a>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            throw new Error('Sentry Frontend Error');
+          }}
+        >
+          Throw error for Sentry
+        </button>
+
+        <div>
+          {testLintArray.map((item) => (
+            <span key={item.id}>{item.text}</span>
+          ))}
+        </div>
       </main>
 
       <footer className={styles.footer}>
         <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          href="https://vercel.com"
           target="_blank"
           rel="noopener noreferrer"
         >
-          Powered by{' '}
+          Powered by
+          {' '}
           <span className={styles.logo}>
             <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
           </span>
         </a>
       </footer>
     </div>
-  )
+  );
 }

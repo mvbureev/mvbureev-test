@@ -2,20 +2,26 @@ version: "3.7"
 
 services:
   test-nextjs:
-    image: test-nextjs
-    container_name: test-nextjs
+    image: nexus.mvbureev.tech:10011/test-nextjs:${CUSTOM_VERSION_FOR_IMAGE:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-nextjs
+    environment:
+      - NODE_ENV
     networks:
       - proxy
     build:
       dockerfile: Dockerfile
       context: ./
       cache_from:
-      - test-nextjs
+      - nexus.mvbureev.tech:10011/test-nextjs:latest
     restart: unless-stopped
 
   test-proxy:
-    image: test-proxy
-    container_name: test-proxy
+    image: nexus.mvbureev.tech:10011/test-proxy:${CUSTOM_VERSION_FOR_IMAGE:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-proxy
+    environment:
+      - DOMAIN
+      - SUBDOMAIN
+      - COMPOSE_PROJECT_NAME
     networks:
       - proxy
     depends_on:
@@ -24,14 +30,15 @@ services:
       dockerfile: Dockerfile
       context: ./nginx
       cache_from:
-      - test-proxy
+      - nexus.mvbureev.tech:10011/test-proxy:latest
     restart: always
     labels:
-      - traefik.http.routers.test.rule=Host("test.${DOMAIN}")
-      - traefik.http.routers.test.entrypoints=https
-      - traefik.http.routers.test.tls=true
-      - traefik.http.routers.test.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host("${SUBDOMAIN}${DOMAIN}")
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=https
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER}
       - traefik.docker.network=proxy
+      - traefik.http.routers.registry.middlewares=traefik-compress
 
 networks:
   proxy:

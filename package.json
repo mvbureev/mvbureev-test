@@ -6,15 +6,42 @@
     "build": "next build",
     "prod": "NODE_ENV=production next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "jest": "jest --watch",
+    "jest:ci": "jest --ci",
+    "cy:verify": "cypress verify",
+    "cy:info": "cypress info",
+    "cy:version": "cypress version",
+    "cy:cache:list": "cypress cache list",
+    "cy:run": "cypress run",
+    "cy:run:record": "cypress run --record",
+    "cy:open": "cypress open",
+    "e2e": "start-server-and-test start http://localhost:3030 cypress",
+    "e2e:run": "start-test start http://localhost:3000 cy:run:record"
   },
   "dependencies": {
+    "@sentry/nextjs": "^6.16.1",
     "next": "12.0.7",
     "react": "17.0.2",
     "react-dom": "17.0.2"
   },
   "devDependencies": {
-    "eslint": "8.5.0",
-    "eslint-config-next": "12.0.7"
+    "@testing-library/jest-dom": "^5.16.1",
+    "@testing-library/react": "^12.1.2",
+    "@testing-library/user-event": "13.5.0",
+    "cypress": "^9.2.0",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-next": "12.0.7",
+    "eslint-plugin-cypress": "^2.12.1",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-jest": "^25.3.4",
+    "eslint-plugin-jest-dom": "^4.0.1",
+    "eslint-plugin-jsx-a11y": "^6.5.1",
+    "eslint-plugin-react": "^7.28.0",
+    "eslint-plugin-react-hooks": "^4.3.0",
+    "eslint-plugin-testing-library": "5.0.1",
+    "jest": "^27.4.7",
+    "start-server-and-test": "^1.14.0"
   }
 }

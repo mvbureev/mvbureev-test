@@ -1,36 +1,176 @@
-image: docker/compose
+stages:
+  # - env
+  - dependencies
+  - lint
+  - test
+  - build
+  # - e2e
+  - package
+  - deploy
+  - clean_up
+
+variables:
+  APK_CACHE_DIR: $CI_PROJECT_DIR/cache/apk
+  ENV_FILE: $CI_PROJECT_DIR/.env
+  NPMRC_PATH: $CI_PROJECT_DIR/./.npmrc
+  SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
+  npm_config_cache: $CI_PROJECT_DIR/.npm
+  # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
 
 cache:
-  key: cache-${CI_PROJECT_TITLE}-${CI_COMMIT_REF_SLUG}
+  key: $CI_COMMIT_REF_NAME
   paths:
+    - $APK_CACHE_DIR
+    - $npm_config_cache
     - node_modules
+    # - cache/Cypress
 
-stages:
-  - build
-  - deploy
+.rules_by_default: &rules_by_default
+  - if: $CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_BRANCH == "main"
+    when: on_success
 
-build:
-  stage: build
-  tags:
-    - mvbureev
+# ------ env ------
+.env_script: &env_script
+  - export CUSTOM_CONTAINER_NAME_STAGING=staging-test
+  - export CUSTOM_CONTAINER_NAME_PRODUCTION=test
+  - sh scripts/env-ci.sh
+  - source $ENV_FILE | true
+  - cp $NPMRC_FILE $NPMRC_PATH | true
+  - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH | true
+  - ls -lsa
+  - cat ./package.json
+
+# ------ dependencies stage ------
+.dependencies_common:
+  image: node:16.13.1-alpine
   before_script:
-    - ls -lsa
+    - *env_script
+    - node -v
+    - npm -v
+    - yarn config set cache-folder $npm_config_cache
+    - yarn install --frozen-lockfile --emoji=false --silent --production=false
+  rules: *rules_by_default
+
+dependencies:
+  extends: .dependencies_common
+  stage: dependencies
+  script:
+    - echo "dependencies"
+  rules:
+    - when: on_success
+
+# ------ lint stage ------
+lint:
+  extends: .dependencies_common
+  stage: lint
+  needs: ["dependencies"]
+  script:
+    - yarn lint
+  rules:
+    - if: $CI_COMMIT_BRANCH != "staging" && $CI_COMMIT_BRANCH != "main"
+      when: on_success
+
+test:
+  extends: .dependencies_common
+  stage: test
+  needs: ["dependencies"]
+  script:
+    - yarn jest:ci
+  rules:
+    - when: on_success
+
+# ------ build stage ------
+build:
+  extends: .dependencies_common
+  stage: build
+  needs:
+    - job: dependencies
+    # - job: lint
+    - job: test
+  script:
+    - SENTRY_DISABLE=true yarn build
+  artifacts:
+    paths:
+      - .next
+      - build
+    expire_in: 1 day
+  rules: *rules_by_default
+
+# ------ e2e stage ------
+# e2e:
+#   extends: .dependencies_common
+#   stage: e2e
+#   image: cypress/browsers:node16.13.0-chrome95-ff94
+#   needs:
+#     - job: build
+#       artifacts: true
+#     - job: dependencies
+#   # parallel: 3
+#   script:
+#     - npx cypress cache path
+#     - npx cypress cache list
+#     - yarn cy:verify
+#     - yarn cy:info
+#     - yarn e2e:run -- --parallel --group "electrons on GitLab CI"
+#   artifacts:
+#     when: always
+#     paths:
+#       - cypress/videos/**/*.mp4
+#       - cypress/screenshots/**/*.png
+#     expire_in: 1 day
+
+# ------ package stage ------
+package:
+  stage: package
+  image: docker
+  needs:
+    - job: build
+      artifacts: true
+    # - job: e2e
+  before_script:
+    - *env_script
+    - mkdir -p $APK_CACHE_DIR
+    - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker info
     - docker-compose version
     - docker-compose config
   script:
+    - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10010 --password-stdin
+    - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10011 --password-stdin
     - docker-compose pull
+    # - docker logout http://nexus.mvbureev.tech:10010
     - docker-compose build
-  only:
-  - main
+    - docker-compose push
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_BRANCH
+    - docker-compose build
+    - docker-compose push
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
+    - docker-compose build
+    - docker-compose push
+  rules: *rules_by_default
 
+# ------ deploy stage ------
 deploy:
   stage: deploy
-  tags:
-    - mvbureev
+  image: docker
+  needs: ["package"]
   before_script:
+    - *env_script
+    - mkdir -p $APK_CACHE_DIR
+    - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker-compose ps
   script:
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
-  only:
-  - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "staging"
+      when: on_success
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+clean_up:
+  image: node:16.13.1-alpine
+  stage: clean_up
+  script:
+    - rm -rf node_modules
+  when: on_failure
