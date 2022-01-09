@@ -54,10 +54,10 @@ variables:
   before_script:
     - *env_script
     - *deps_script
-  artifacts:
-    paths:
-      - $npm_config_cache
-    expire_in: 1 hours
+  # artifacts:
+  #   paths:
+  #     - $npm_config_cache
+  #   expire_in: 1 hours
   cache: *cache_node
 
 deps:
@@ -108,13 +108,13 @@ test:
   needs:
     - job: deps
       optional: true
-      artifacts: true
+      # artifacts: true
     - job: deps_staging
       optional: true
-      artifacts: true
+      # artifacts: true
     - job: deps_production
       optional: true
-      artifacts: true
+      # artifacts: true
   script:
     - yarn jest:ci
   rules:
@@ -127,10 +127,10 @@ test:
   needs:
     - job: deps_staging
       optional: true
-      artifacts: true
+      # artifacts: true
     - job: deps_production
       optional: true
-      artifacts: true
+      # artifacts: true
     # - job: lint
     - job: test
   script:
@@ -213,8 +213,8 @@ build_production:
 package_staging:
   extends: .package_common
   needs:
-    - job: deps_staging
-      artifacts: true
+    # - job: deps_staging
+    #   artifacts: true
     - job: build_staging
       artifacts: true
     # - job: e2e
@@ -226,8 +226,8 @@ package_staging:
 package_production:
   extends: .package_common
   needs:
-    - job: deps_production
-      artifacts: true
+    # - job: deps_production
+    #   artifacts: true
     - job: build_production
       artifacts: true
     # - job: e2e
