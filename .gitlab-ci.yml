@@ -57,6 +57,7 @@ variables:
   artifacts:
     paths:
       - $npm_config_cache
+    expire_in: 1 hours
   cache: *cache_node
 
 deps:
