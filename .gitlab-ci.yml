@@ -17,14 +17,6 @@ variables:
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
   ENV_STAGE: $ENV_DEFAULT
 
-cache:
-  key: $CI_COMMIT_REF_NAME
-  paths:
-    - $APK_CACHE_DIR
-    - $npm_config_cache
-    - node_modules
-    # - cache/Cypress
-
 .rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
     when: on_success
@@ -57,6 +49,11 @@ cache:
   before_script:
     - *env_script
     - *deps_script
+  cache:
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $npm_config_cache
+      - node_modules
 
 deps:
   extends: .deps_common
@@ -135,6 +132,11 @@ test:
       - .next
       - build
     expire_in: 1 day
+  cache:
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $npm_config_cache
+      - node_modules
 
 build_staging:
   extends: .build_common
@@ -168,6 +170,14 @@ build_production:
 #       - cypress/videos/**/*.mp4
 #       - cypress/screenshots/**/*.png
 #     expire_in: 1 day
+    # cache:
+    #   key: $CI_COMMIT_REF_NAME
+    #   paths:
+    #     - $APK_CACHE_DIR
+    #     - $npm_config_cache
+    #     - node_modules
+    #     - cache/Cypress
+
 
 # ------ package stage ------
 .package_common:
@@ -191,6 +201,11 @@ build_production:
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose build
     - docker-compose push
+  cache:
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $APK_CACHE_DIR
+      - node_modules
 
 package_staging:
   extends: .package_common
@@ -226,6 +241,10 @@ package_production:
     - docker-compose ps
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
+  cache:
+    key: $CI_COMMIT_REF_NAME
+    paths:
+      - $APK_CACHE_DIR
 
 deploy_staging:
   extends: .deploy_common
