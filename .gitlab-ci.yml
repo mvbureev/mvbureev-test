@@ -15,8 +15,7 @@ variables:
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
   npm_config_cache: $CI_PROJECT_DIR/.npm
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
-  # ENV_STAGE: $ENV_DEFAULT
-  ENV_STAGE: "$ENV_DEFAULT"
+  ENV_STAGE: $ENV_DEFAULT
 
 cache:
   key: $CI_COMMIT_REF_NAME
@@ -35,10 +34,10 @@ cache:
     when: on_success
 
 .env_script: &env_script
-  - cp $NPMRC_FILE $NPMRC_PATH | true
-  - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH | true
-  - source $ENV_DEFAULT | true
-  - source $ENV_STAGE | true
+  - cp $NPMRC_FILE $NPMRC_PATH
+  - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH
+  - source $ENV_DEFAULT
+  - source $ENV_STAGE
   - ls -lsa
   - cat ./package.json
 
