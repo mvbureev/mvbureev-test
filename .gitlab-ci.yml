@@ -17,6 +17,14 @@ variables:
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
   ENV_STAGE: $ENV_DEFAULT
 
+.cache_node: &cache_node
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - $npm_config_cache
+      - node_modules
+
 .rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
     when: on_success
@@ -47,11 +55,7 @@ variables:
   before_script:
     - *env_script
     - *deps_script
-  cache:
-    key: $CI_COMMIT_REF_NAME
-    paths:
-      - $npm_config_cache
-      - node_modules
+  cache: *cache_node
 
 deps:
   extends: .deps_common
@@ -101,10 +105,13 @@ test:
   needs:
     - job: deps
       optional: true
+      artifacts: true
     - job: deps_staging
       optional: true
+      artifacts: true
     - job: deps_production
       optional: true
+      artifacts: true
   script:
     - yarn jest:ci
   rules:
@@ -117,10 +124,13 @@ test:
   needs:
     - job: deps
       optional: true
+      artifacts: true
     - job: deps_staging
       optional: true
+      artifacts: true
     - job: deps_production
       optional: true
+      artifacts: true
     # - job: lint
     - job: test
   script:
@@ -131,11 +141,7 @@ test:
       - build
       - node_modules
     expire_in: 1 day
-  cache:
-    key: $CI_COMMIT_REF_NAME
-    paths:
-      - $npm_config_cache
-      - node_modules
+  cache: *cache_node
 
 build_staging:
   extends: .build_common
@@ -170,7 +176,7 @@ build_production:
 #       - cypress/screenshots/**/*.png
 #     expire_in: 1 day
     # cache:
-    #   key: $CI_COMMIT_REF_NAME
+    #   key: e2e_$CI_COMMIT_REF_NAME
     #   paths:
     #     - $APK_CACHE_DIR
     #     - $npm_config_cache
