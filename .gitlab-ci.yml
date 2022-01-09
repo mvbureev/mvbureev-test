@@ -36,8 +36,10 @@ cache:
 .env_script: &env_script
   - cp $NPMRC_FILE $NPMRC_PATH
   - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH
-  - source $ENV_DEFAULT
-  - source $ENV_STAGE
+  - cat $ENV_DEFAULT >> .env
+  - cat $ENV_STAGE >> .env
+  - cat .env
+  - source .env
   - ls -lsa
   - cat ./package.json
 
