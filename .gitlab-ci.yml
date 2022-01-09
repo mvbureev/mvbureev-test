@@ -274,4 +274,5 @@ clean_up:
   stage: clean_up
   script:
     - rm -rf node_modules
+    - rm -rf $npm_config_cache
   when: on_failure
