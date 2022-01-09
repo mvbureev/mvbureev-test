@@ -189,11 +189,11 @@ clean_up:
     - docker-compose pull
     - docker-compose build
     - docker-compose push
-    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA
     - docker-compose build
     - docker-compose push
     - docker-compose ps
-    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
+    # - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
   cache:
     key: $CI_COMMIT_REF_NAME
