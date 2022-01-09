@@ -23,7 +23,6 @@ variables:
         - yarn.lock
     paths:
       - $npm_config_cache
-      # - node_modules
 
 .rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
@@ -57,7 +56,7 @@ variables:
     - *deps_script
   artifacts:
     paths:
-      - .npm
+      - $npm_config_cache
   cache: *cache_node
 
 deps:
@@ -125,9 +124,6 @@ test:
   extends: .deps_common
   stage: build
   needs:
-    - job: deps
-      optional: true
-      artifacts: true
     - job: deps_staging
       optional: true
       artifacts: true
@@ -142,7 +138,6 @@ test:
     paths:
       - .next
       - build
-      - .npm
     expire_in: 1 day
   cache: *cache_node
 
@@ -212,11 +207,13 @@ build_production:
     key: $CI_COMMIT_REF_NAME
     paths:
       - $APK_CACHE_DIR
-      # - node_modules
+      - $npm_config_cache
 
 package_staging:
   extends: .package_common
   needs:
+    - job: deps_staging
+      artifacts: true
     - job: build_staging
       artifacts: true
     # - job: e2e
@@ -228,6 +225,8 @@ package_staging:
 package_production:
   extends: .package_common
   needs:
+    - job: deps_production
+      artifacts: true
     - job: build_production
       artifacts: true
     # - job: e2e
