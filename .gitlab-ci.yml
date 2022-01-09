@@ -1,6 +1,6 @@
 stages:
   # - env
-  - dependencies
+  - deps
   - lint
   - test
   - build
@@ -15,7 +15,8 @@ variables:
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
   npm_config_cache: $CI_PROJECT_DIR/.npm
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
-  ENV_STAGE: ""
+  # ENV_STAGE: $ENV_DEFAULT
+  ENV_STAGE: "$ENV_DEFAULT"
 
 cache:
   key: $CI_COMMIT_REF_NAME
@@ -41,56 +42,55 @@ cache:
   - ls -lsa
   - cat ./package.json
 
-# ------ dependencies stage ------
-.dependencies_common:
+# ------ deps stage ------
+.deps_script: &deps_script
+  - node -v
+  - npm -v
+  - yarn config set cache-folder $npm_config_cache
+  - yarn install --frozen-lockfile --emoji=false --silent --production=false
+
+.deps_common:
   image: node:16.13.1-alpine
   before_script:
     - *env_script
-    - node -v
-    - npm -v
-    - yarn config set cache-folder $npm_config_cache
-    - yarn install --frozen-lockfile --emoji=false --silent --production=false
+    - *deps_script
 
-dependencies:
-  extends: .dependencies_common
-  stage: dependencies
-  variables:
-    ENV_STAGE: ""
+deps:
+  extends: .deps_common
+  stage: deps
   script:
-    - echo "dependencies"
+    - echo "deps"
   rules:
     - if: $CI_COMMIT_REF_NAME != "staging" && $CI_COMMIT_REF_NAME != "main"
       when: on_success
 
-dependencies_staging:
-  extends: .dependencies_common
-  stage: dependencies
-  variables:
-    ENV_STAGE: $ENV_STAGING
+deps_staging:
+  extends: .deps_common
+  stage: deps
+  before_script: &deps_staging_before_script
+    - export ENV_STAGE=$ENV_STAGING
+    - *env_script
+    - *deps_script
   script:
-    - echo "dependencies"
+    - echo "deps_staging"
   rules: *rules_staging
 
-dependencies_production:
-  extends: .dependencies_common
-  stage: dependencies
-  variables:
-    ENV_STAGE: $ENV_PRODUCTION
+deps_production:
+  extends: .deps_common
+  stage: deps
+  before_script: &deps_production_before_script
+    - export ENV_STAGE=$ENV_PRODUCTION
+    - *env_script
+    - *deps_script
   script:
-    - echo "dependencies"
+    - echo "deps_production"
   rules: *rules_production
 
 # ------ lint stage ------
 lint:
-  extends: .dependencies_common
+  extends: .deps_common
   stage: lint
-  needs:
-    - job: dependencies
-      optional: true
-    - job: dependencies_staging
-      optional: true
-    - job: dependencies_production
-      optional: true
+  needs: [deps]
   script:
     - yarn lint
   rules:
@@ -98,14 +98,14 @@ lint:
       when: on_success
 
 test:
-  extends: .dependencies_common
+  extends: .deps_common
   stage: test
   needs:
-    - job: dependencies
+    - job: deps
       optional: true
-    - job: dependencies_staging
+    - job: deps_staging
       optional: true
-    - job: dependencies_production
+    - job: deps_production
       optional: true
   script:
     - yarn jest:ci
@@ -114,14 +114,14 @@ test:
 
 # ------ build stage ------
 .build_common:
-  extends: .dependencies_common
+  extends: .deps_common
   stage: build
   needs:
-    - job: dependencies
+    - job: deps
       optional: true
-    - job: dependencies_staging
+    - job: deps_staging
       optional: true
-    - job: dependencies_production
+    - job: deps_production
       optional: true
     # - job: lint
     - job: test
@@ -135,25 +135,23 @@ test:
 
 build_staging:
   extends: .build_common
-  variables:
-    ENV_STAGE: $ENV_STAGING
+  before_script: *deps_staging_before_script
   rules: *rules_staging
 
 build_production:
   extends: .build_common
-  variables:
-    ENV_STAGE: $ENV_PRODUCTION
+  before_script: *deps_production_before_script
   rules: *rules_production
 
 # ------ e2e stage ------
 # e2e:
-#   extends: .dependencies_common
+#   extends: .deps_common
 #   stage: e2e
 #   image: cypress/browsers:node16.13.0-chrome95-ff94
 #   needs:
 #     - job: build
 #       artifacts: true
-#     - job: dependencies
+#     - job: deps
 #   # parallel: 3
 #   script:
 #     - npx cypress cache path
@@ -172,14 +170,13 @@ build_production:
 .package_common:
   stage: package
   image: docker
-  before_script:
+  script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
     - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker info
     - docker-compose version
     - docker-compose config
-  script:
     - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10010 --password-stdin
     - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10011 --password-stdin
     - docker-compose pull
@@ -198,8 +195,9 @@ package_staging:
     - job: build_staging
       artifacts: true
     # - job: e2e
-  variables:
-    ENV_STAGE: $ENV_STAGING
+  before_script:
+    - export ENV_STAGE=$ENV_STAGING
+    - *env_script
   rules: *rules_staging
 
 package_production:
@@ -208,8 +206,9 @@ package_production:
     - job: build_production
       artifacts: true
     # - job: e2e
-  variables:
-    ENV_STAGE: $ENV_PRODUCTION
+  before_script:
+    - export ENV_STAGE=$ENV_PRODUCTION
+    - *env_script
   rules: *rules_production
 
 # ------ deploy stage ------
@@ -217,22 +216,28 @@ package_production:
   stage: deploy
   image: docker
   before_script:
+  script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
     - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker-compose ps
-  script:
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
 
 deploy_staging:
   extends: .deploy_common
-  needs: ["package_staging"]
+  needs: [package_staging]
+  before_script:
+    - export ENV_STAGE=$ENV_STAGING
+    - *env_script
   rules: *rules_staging
 
 deploy_production:
   extends: .deploy_common
-  needs: ["package_production"]
+  needs: [package_production]
+  before_script:
+    - export ENV_STAGE=$ENV_PRODUCTION
+    - *env_script
   rules:
     - if: $CI_COMMIT_REF_NAME == "main"
       when: manual
