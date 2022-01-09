@@ -15,6 +15,7 @@ variables:
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
   npm_config_cache: $CI_PROJECT_DIR/.npm
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
+  ENV_STAGE: ""
 
 cache:
   key: $CI_COMMIT_REF_NAME
@@ -24,7 +25,7 @@ cache:
     - node_modules
     # - cache/Cypress
 
-#
+# SKIP SYNTAX ERROR
 .rules_env_stage: &rules_env_stage
   - if: $CI_COMMIT_REF_NAME == "staging"
     when: on_success
