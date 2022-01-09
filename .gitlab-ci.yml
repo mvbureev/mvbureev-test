@@ -234,7 +234,7 @@ deploy_production:
   extends: .deploy_common
   needs: ["package_production"]
   rules:
-    - if: $CI_COMMIT_REF_NAME == "staging"
+    - if: $CI_COMMIT_REF_NAME == "main"
       when: manual
 
 clean_up:
