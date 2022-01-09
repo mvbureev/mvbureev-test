@@ -5,8 +5,8 @@ stages:
   - build
   # - e2e
   - clean_up
-  - package
-  - deploy
+  - pkg_deploy
+  # - deploy
 
 variables:
   APK_CACHE_DIR: $CI_PROJECT_DIR/cache/apk
@@ -38,7 +38,7 @@ variables:
     $ENV_DEFAULT" >> .env
   - source .env
   - ls -lsa
-  - cat ./package.json
+  - cat ./pkg.json
 
 # ------ deps stage ------
 .deps_script: &deps_script
@@ -119,7 +119,6 @@ test:
       optional: true
     - job: deps_production
       optional: true
-    # - job: lint
     - job: test
   script:
     - SENTRY_DISABLE=true yarn build
@@ -177,9 +176,9 @@ clean_up:
     - rm -rf node_modules
   when: on_failure
 
-# ------ package stage ------
-.package_common:
-  stage: package
+# ------ pkg_deploy stage ------
+.pkg_deploy_common:
+  stage: pkg_deploy
   image: docker/compose
   script:
     - docker info
@@ -190,19 +189,19 @@ clean_up:
     - docker-compose pull
     - docker-compose build
     - docker-compose push
-    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_REF_NAME
-    - docker-compose build
-    - docker-compose push
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose build
     - docker-compose push
+    - docker-compose ps
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
+    - docker-compose up -d
   cache:
     key: $CI_COMMIT_REF_NAME
     paths:
       - $APK_CACHE_DIR
 
-package_staging:
-  extends: .package_common
+pkg_deploy_staging:
+  extends: .pkg_deploy_common
   needs:
     - job: build_staging
       artifacts: true
@@ -212,42 +211,12 @@ package_staging:
     - *env_script
   rules: *rules_staging
 
-package_production:
-  extends: .package_common
+pkg_deploy_production:
+  extends: .pkg_deploy_common
   needs:
     - job: build_production
       artifacts: true
     # - job: e2e
-  before_script:
-    - export ENV_STAGE=$ENV_PRODUCTION
-    - *env_script
-  rules: *rules_production
-
-# ------ deploy stage ------
-.deploy_common:
-  stage: deploy
-  image: docker/compose
-  before_script:
-  script:
-    - docker-compose ps
-    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
-    - docker-compose up -d
-  cache:
-    key: $CI_COMMIT_REF_NAME
-    paths:
-      - $APK_CACHE_DIR
-
-deploy_staging:
-  extends: .deploy_common
-  needs: [package_staging]
-  before_script:
-    - export ENV_STAGE=$ENV_STAGING
-    - *env_script
-  rules: *rules_staging
-
-deploy_production:
-  extends: .deploy_common
-  needs: [package_production]
   before_script:
     - export ENV_STAGE=$ENV_PRODUCTION
     - *env_script
