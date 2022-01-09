@@ -25,18 +25,14 @@ cache:
     - node_modules
     # - cache/Cypress
 
-# SKIP SYNTAX ERROR
-.rules_env_stage: &rules_env_stage
+.rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
     when: on_success
-    variables:
-      ENV_STAGE: $ENV_STAGING
+
+.rules_production: &rules_production
   - if: $CI_COMMIT_REF_NAME == "main"
     when: on_success
-    variables:
-      ENV_STAGE: $ENV_PRODUCTION
 
-# ------ env ------
 .env_script: &env_script
   - cp $NPMRC_FILE $NPMRC_PATH | true
   - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH | true
@@ -48,7 +44,6 @@ cache:
 # ------ dependencies stage ------
 .dependencies_common:
   image: node:16.13.1-alpine
-  rules: *rules_env_stage
   before_script:
     - *env_script
     - node -v
@@ -59,16 +54,43 @@ cache:
 dependencies:
   extends: .dependencies_common
   stage: dependencies
+  variables:
+    ENV_STAGE: ""
   script:
     - echo "dependencies"
   rules:
-    - when: on_success
+    - if: $CI_COMMIT_REF_NAME != "staging" && $CI_COMMIT_REF_NAME != "main"
+      when: on_success
+
+dependencies_staging:
+  extends: .dependencies_common
+  stage: dependencies
+  variables:
+    ENV_STAGE: $ENV_STAGING
+  script:
+    - echo "dependencies"
+  rules: *rules_staging
+
+dependencies_production:
+  extends: .dependencies_common
+  stage: dependencies
+  variables:
+    ENV_STAGE: $ENV_PRODUCTION
+  script:
+    - echo "dependencies"
+  rules: *rules_production
 
 # ------ lint stage ------
 lint:
   extends: .dependencies_common
   stage: lint
-  needs: [dependencies]
+  needs:
+    - job: dependencies
+      optional: true
+    - job: dependencies_staging
+      optional: true
+    - job: dependencies_production
+      optional: true
   script:
     - yarn lint
   rules:
@@ -78,18 +100,29 @@ lint:
 test:
   extends: .dependencies_common
   stage: test
-  needs: [dependencies]
+  needs:
+    - job: dependencies
+      optional: true
+    - job: dependencies_staging
+      optional: true
+    - job: dependencies_production
+      optional: true
   script:
     - yarn jest:ci
   rules:
     - when: on_success
 
 # ------ build stage ------
-build:
+.build_common:
   extends: .dependencies_common
   stage: build
   needs:
     - job: dependencies
+      optional: true
+    - job: dependencies_staging
+      optional: true
+    - job: dependencies_production
+      optional: true
     # - job: lint
     - job: test
   script:
@@ -99,6 +132,18 @@ build:
       - .next
       - build
     expire_in: 1 day
+
+build_staging:
+  extends: .build_common
+  variables:
+    ENV_STAGE: $ENV_STAGING
+  rules: *rules_staging
+
+build_production:
+  extends: .build_common
+  variables:
+    ENV_STAGE: $ENV_PRODUCTION
+  rules: *rules_production
 
 # ------ e2e stage ------
 # e2e:
@@ -124,14 +169,9 @@ build:
 #     expire_in: 1 day
 
 # ------ package stage ------
-package:
+.package_common:
   stage: package
   image: docker
-  needs:
-    - job: build
-      artifacts: true
-    # - job: e2e
-  rules: *rules_env_stage
   before_script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
@@ -143,7 +183,6 @@ package:
     - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10010 --password-stdin
     - echo ${HUB_PASSWORD} | docker login -u ${HUB_USER} http://nexus.mvbureev.tech:10011 --password-stdin
     - docker-compose pull
-    # - docker logout http://nexus.mvbureev.tech:10010
     - docker-compose build
     - docker-compose push
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_REF_NAME
@@ -153,15 +192,30 @@ package:
     - docker-compose build
     - docker-compose push
 
+package_staging:
+  extends: .package_common
+  needs:
+    - job: build_staging
+      artifacts: true
+    # - job: e2e
+  variables:
+    ENV_STAGE: $ENV_STAGING
+  rules: *rules_staging
+
+package_production:
+  extends: .package_common
+  needs:
+    - job: build_production
+      artifacts: true
+    # - job: e2e
+  variables:
+    ENV_STAGE: $ENV_PRODUCTION
+  rules: *rules_production
+
 # ------ deploy stage ------
-deploy:
+.deploy_common:
   stage: deploy
   image: docker
-  needs: ["package"]
-  rules:
-    - *rules_env_stage
-    - if: $CI_COMMIT_REF_NAME == "main"
-      when: manual
   before_script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
@@ -170,6 +224,18 @@ deploy:
   script:
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
+
+deploy_staging:
+  extends: .deploy_common
+  needs: ["package_staging"]
+  rules: *rules_staging
+
+deploy_production:
+  extends: .deploy_common
+  needs: ["package_production"]
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "staging"
+      when: manual
 
 clean_up:
   image: node:16.13.1-alpine
