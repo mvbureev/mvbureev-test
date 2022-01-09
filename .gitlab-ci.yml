@@ -1,19 +1,17 @@
 stages:
-  # - env
   - deps
   - lint
   - test
   - build
   # - e2e
+  - clean_up
   - package
   - deploy
-  - clean_up
 
 variables:
   APK_CACHE_DIR: $CI_PROJECT_DIR/cache/apk
   NPMRC_PATH: $CI_PROJECT_DIR/.npmrc
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
-  npm_config_cache: $CI_PROJECT_DIR/.npm
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
   ENV_STAGE: $ENV_DEFAULT
 
@@ -22,7 +20,7 @@ variables:
       files:
         - yarn.lock
     paths:
-      - $npm_config_cache
+      - node_modules
 
 .rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
@@ -35,10 +33,12 @@ variables:
 .env_script: &env_script
   - cp $NPMRC_FILE $NPMRC_PATH
   - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH
-  - echo -e "$ENV_STAGE" > .env.stage
-  - echo -e "$ENV_DEFAULT" > .env.default
-  - source .env.stage
-  - source .env.default
+  - >
+    cat <<EOT >> .env
+    $ENV_STAGE
+    $ENV_DEFAULT
+    EOT
+  - source .env
   - ls -lsa
   - cat ./package.json
 
@@ -46,7 +46,6 @@ variables:
 .deps_script: &deps_script
   - node -v
   - npm -v
-  - yarn config set cache-folder $npm_config_cache
   - yarn install --frozen-lockfile --emoji=false --silent --production=false
 
 .deps_common:
@@ -54,10 +53,6 @@ variables:
   before_script:
     - *env_script
     - *deps_script
-  # artifacts:
-  #   paths:
-  #     - $npm_config_cache
-  #   expire_in: 1 hours
   cache: *cache_node
 
 deps:
@@ -108,13 +103,10 @@ test:
   needs:
     - job: deps
       optional: true
-      # artifacts: true
     - job: deps_staging
       optional: true
-      # artifacts: true
     - job: deps_production
       optional: true
-      # artifacts: true
   script:
     - yarn jest:ci
   rules:
@@ -127,10 +119,8 @@ test:
   needs:
     - job: deps_staging
       optional: true
-      # artifacts: true
     - job: deps_production
       optional: true
-      # artifacts: true
     # - job: lint
     - job: test
   script:
@@ -178,18 +168,22 @@ build_production:
     #   key: e2e_$CI_COMMIT_REF_NAME
     #   paths:
     #     - $APK_CACHE_DIR
-    #     - $npm_config_cache
     # #   - node_modules
     #     - cache/Cypress
 
+# ------ clean_up stage ------
+clean_up:
+  image: node:16.13.1-alpine
+  stage: clean_up
+  script:
+    - rm -rf node_modules
+  when: on_failure
 
 # ------ package stage ------
 .package_common:
   stage: package
-  image: docker
+  image: docker/compose
   script:
-    - mkdir -p $APK_CACHE_DIR
-    - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker info
     - docker-compose version
     - docker-compose config
@@ -205,16 +199,13 @@ build_production:
     - docker-compose build
     - docker-compose push
   cache:
-    key: package_$CI_COMMIT_REF_NAME
+    key: $CI_COMMIT_REF_NAME
     paths:
       - $APK_CACHE_DIR
-      - $npm_config_cache
 
 package_staging:
   extends: .package_common
   needs:
-    # - job: deps_staging
-    #   artifacts: true
     - job: build_staging
       artifacts: true
     # - job: e2e
@@ -226,8 +217,6 @@ package_staging:
 package_production:
   extends: .package_common
   needs:
-    # - job: deps_production
-    #   artifacts: true
     - job: build_production
       artifacts: true
     # - job: e2e
@@ -239,16 +228,14 @@ package_production:
 # ------ deploy stage ------
 .deploy_common:
   stage: deploy
-  image: docker
+  image: docker/compose
   before_script:
   script:
-    - mkdir -p $APK_CACHE_DIR
-    - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker-compose ps
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
   cache:
-    key: deploy_$CI_COMMIT_REF_NAME
+    key: $CI_COMMIT_REF_NAME
     paths:
       - $APK_CACHE_DIR
 
@@ -269,11 +256,3 @@ deploy_production:
   rules:
     - if: $CI_COMMIT_REF_NAME == "main"
       when: manual
-
-clean_up:
-  image: node:16.13.1-alpine
-  stage: clean_up
-  script:
-    - rm -rf node_modules
-    - rm -rf $npm_config_cache
-  when: on_failure
