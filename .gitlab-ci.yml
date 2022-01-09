@@ -11,7 +11,7 @@ stages:
 
 variables:
   APK_CACHE_DIR: $CI_PROJECT_DIR/cache/apk
-  NPMRC_PATH: $CI_PROJECT_DIR/./.npmrc
+  NPMRC_PATH: $CI_PROJECT_DIR/.npmrc
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
   npm_config_cache: $CI_PROJECT_DIR/.npm
   # CYPRESS_CACHE_FOLDER: $CI_PROJECT_DIR/cache/Cypress
@@ -55,6 +55,9 @@ variables:
   before_script:
     - *env_script
     - *deps_script
+  artifacts:
+    paths:
+      - .npm
   cache: *cache_node
 
 deps:
@@ -139,7 +142,7 @@ test:
     paths:
       - .next
       - build
-      # - node_modules
+      - .npm
     expire_in: 1 day
   cache: *cache_node
 
