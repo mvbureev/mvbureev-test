@@ -11,7 +11,6 @@ stages:
 
 variables:
   APK_CACHE_DIR: $CI_PROJECT_DIR/cache/apk
-  ENV_FILE: $CI_PROJECT_DIR/.env
   NPMRC_PATH: $CI_PROJECT_DIR/./.npmrc
   SENTRY_CLI_RC_PATH: $CI_PROJECT_DIR/.sentryclirc
   npm_config_cache: $CI_PROJECT_DIR/.npm
@@ -25,31 +24,36 @@ cache:
     - node_modules
     # - cache/Cypress
 
-.rules_by_default: &rules_by_default
-  - if: $CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_BRANCH == "main"
+#
+.rules_env_stage: &rules_env_stage
+  - if: $CI_COMMIT_REF_NAME == "staging"
     when: on_success
+    variables:
+      ENV_STAGE: $ENV_STAGING
+  - if: $CI_COMMIT_REF_NAME == "main"
+    when: on_success
+    variables:
+      ENV_STAGE: $ENV_PRODUCTION
 
 # ------ env ------
 .env_script: &env_script
-  - export CUSTOM_CONTAINER_NAME_STAGING=staging-test
-  - export CUSTOM_CONTAINER_NAME_PRODUCTION=test
-  - sh scripts/env-ci.sh
-  - source $ENV_FILE | true
   - cp $NPMRC_FILE $NPMRC_PATH | true
   - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH | true
+  - source $ENV_DEFAULT | true
+  - source $ENV_STAGE | true
   - ls -lsa
   - cat ./package.json
 
 # ------ dependencies stage ------
 .dependencies_common:
   image: node:16.13.1-alpine
+  rules: *rules_env_stage
   before_script:
     - *env_script
     - node -v
     - npm -v
     - yarn config set cache-folder $npm_config_cache
     - yarn install --frozen-lockfile --emoji=false --silent --production=false
-  rules: *rules_by_default
 
 dependencies:
   extends: .dependencies_common
@@ -63,17 +67,17 @@ dependencies:
 lint:
   extends: .dependencies_common
   stage: lint
-  needs: ["dependencies"]
+  needs: [dependencies]
   script:
     - yarn lint
   rules:
-    - if: $CI_COMMIT_BRANCH != "staging" && $CI_COMMIT_BRANCH != "main"
+    - if: $CI_COMMIT_REF_NAME != "staging" && $CI_COMMIT_REF_NAME != "main"
       when: on_success
 
 test:
   extends: .dependencies_common
   stage: test
-  needs: ["dependencies"]
+  needs: [dependencies]
   script:
     - yarn jest:ci
   rules:
@@ -94,7 +98,6 @@ build:
       - .next
       - build
     expire_in: 1 day
-  rules: *rules_by_default
 
 # ------ e2e stage ------
 # e2e:
@@ -127,6 +130,7 @@ package:
     - job: build
       artifacts: true
     # - job: e2e
+  rules: *rules_env_stage
   before_script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
@@ -141,19 +145,22 @@ package:
     # - docker logout http://nexus.mvbureev.tech:10010
     - docker-compose build
     - docker-compose push
-    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_BRANCH
+    - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_REF_NAME
     - docker-compose build
     - docker-compose push
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose build
     - docker-compose push
-  rules: *rules_by_default
 
 # ------ deploy stage ------
 deploy:
   stage: deploy
   image: docker
   needs: ["package"]
+  rules:
+    - *rules_env_stage
+    - if: $CI_COMMIT_REF_NAME == "main"
+      when: manual
   before_script:
     - *env_script
     - mkdir -p $APK_CACHE_DIR
@@ -162,11 +169,6 @@ deploy:
   script:
     - export CUSTOM_VERSION_FOR_IMAGE=$CI_COMMIT_SHORT_SHA
     - docker-compose up -d
-  rules:
-    - if: $CI_COMMIT_BRANCH == "staging"
-      when: on_success
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: manual
 
 clean_up:
   image: node:16.13.1-alpine
