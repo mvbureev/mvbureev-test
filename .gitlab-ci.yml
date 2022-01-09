@@ -38,7 +38,7 @@ variables:
     $ENV_DEFAULT" >> .env
   - source .env
   - ls -lsa
-  - cat ./pkg.json
+  - cat ./package.json
 
 # ------ deps stage ------
 .deps_script: &deps_script
