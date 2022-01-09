@@ -131,6 +131,7 @@ test:
     paths:
       - .next
       - build
+      - node_modules
     expire_in: 1 day
   cache:
     key: $CI_COMMIT_REF_NAME
