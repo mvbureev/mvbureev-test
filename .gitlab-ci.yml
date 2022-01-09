@@ -183,7 +183,6 @@ build_production:
   stage: package
   image: docker
   script:
-    - *env_script
     - mkdir -p $APK_CACHE_DIR
     - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker info
@@ -234,7 +233,6 @@ package_production:
   image: docker
   before_script:
   script:
-    - *env_script
     - mkdir -p $APK_CACHE_DIR
     - apk add --cache-dir $APK_CACHE_DIR docker-compose
     - docker-compose ps
