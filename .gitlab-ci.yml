@@ -23,7 +23,7 @@ variables:
         - yarn.lock
     paths:
       - $npm_config_cache
-      - node_modules
+      # - node_modules
 
 .rules_staging: &rules_staging
   - if: $CI_COMMIT_REF_NAME == "staging"
@@ -139,7 +139,7 @@ test:
     paths:
       - .next
       - build
-      - node_modules
+      # - node_modules
     expire_in: 1 day
   cache: *cache_node
 
@@ -180,7 +180,7 @@ build_production:
     #   paths:
     #     - $APK_CACHE_DIR
     #     - $npm_config_cache
-    #     - node_modules
+    # #   - node_modules
     #     - cache/Cypress
 
 
@@ -209,7 +209,7 @@ build_production:
     key: $CI_COMMIT_REF_NAME
     paths:
       - $APK_CACHE_DIR
-      - node_modules
+      # - node_modules
 
 package_staging:
   extends: .package_common
