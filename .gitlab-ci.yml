@@ -34,10 +34,8 @@ variables:
   - cp $NPMRC_FILE $NPMRC_PATH
   - cp $SENTRYRC_FILE $SENTRY_CLI_RC_PATH
   - >
-    cat <<EOT >> .env
-    $ENV_STAGE
-    $ENV_DEFAULT
-    EOT
+    echo "$ENV_STAGE
+    $ENV_DEFAULT" >> .env
   - source .env
   - ls -lsa
   - cat ./package.json
